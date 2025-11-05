@@ -11,12 +11,12 @@
   "repository": {},
   "license": "UNLICENSED",
   "dependencies": {
-    "@remotion/cli": "^4.0.370",
-    "@remotion/zod-types": "4.0.370",
+    "@remotion/cli": "^4.0.371",
+    "@remotion/zod-types": "4.0.371",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "remotion": "^4.0.370",
-    "zod": "^3.22.3"
+    "remotion": "^4.0.371",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.4",
