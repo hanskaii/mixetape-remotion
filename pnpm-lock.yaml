@@ -6,11 +6,11 @@ settings:
 
 dependencies:
   '@remotion/cli':
-    specifier: ^4.0.371
+    specifier: ^4.0.372
     version: 4.0.372(react-dom@19.0.0)(react@19.0.0)
   '@remotion/zod-types':
-    specifier: 4.0.371
-    version: 4.0.371(react-dom@19.0.0)(react@19.0.0)(zod@3.25.76)
+    specifier: 4.0.372
+    version: 4.0.372(react-dom@19.0.0)(react@19.0.0)(zod@3.25.76)
   react:
     specifier: 19.0.0
     version: 19.0.0
@@ -18,7 +18,7 @@ dependencies:
     specifier: 19.0.0
     version: 19.0.0(react@19.0.0)
   remotion:
-    specifier: ^4.0.371
+    specifier: ^4.0.372
     version: 4.0.372(react-dom@19.0.0)(react@19.0.0)
   zod:
     specifier: ^3.25.76
@@ -649,18 +649,6 @@ packages:
       remotion: 4.0.372(react-dom@19.0.0)(react@19.0.0)
     dev: false
 
-  /@remotion/zod-types@4.0.371(react-dom@19.0.0)(react@19.0.0)(zod@3.25.76):
-    resolution: {integrity: sha512-f7X4cu03SG40snHmIH4BOhwpoiGvbpMlvlruHGgoBQLaFoWADyOcYes6KuLuOqwFvJ8TenrL57rmBIbs+DN2UQ==}
-    peerDependencies:
-      zod: 3.22.3
-    dependencies:
-      remotion: 4.0.371(react-dom@19.0.0)(react@19.0.0)
-      zod: 3.25.76
-    transitivePeerDependencies:
-      - react
-      - react-dom
-    dev: false
-
   /@remotion/zod-types@4.0.372(react-dom@19.0.0)(react@19.0.0)(zod@3.22.3):
     resolution: {integrity: sha512-wWb+Rb2tbKsA6kA3338oLiYIpCl+0unCQAxxptVM6R1/jYYikclKURAwEoaOxhN8L21iajvFpmnyPHkemUBF4Q==}
     peerDependencies:
@@ -668,6 +656,18 @@ packages:
     dependencies:
       remotion: 4.0.372(react-dom@19.0.0)(react@19.0.0)
       zod: 3.22.3
+    transitivePeerDependencies:
+      - react
+      - react-dom
+    dev: false
+
+  /@remotion/zod-types@4.0.372(react-dom@19.0.0)(react@19.0.0)(zod@3.25.76):
+    resolution: {integrity: sha512-wWb+Rb2tbKsA6kA3338oLiYIpCl+0unCQAxxptVM6R1/jYYikclKURAwEoaOxhN8L21iajvFpmnyPHkemUBF4Q==}
+    peerDependencies:
+      zod: 3.22.3
+    dependencies:
+      remotion: 4.0.372(react-dom@19.0.0)(react@19.0.0)
+      zod: 3.25.76
     transitivePeerDependencies:
       - react
       - react-dom
@@ -1489,16 +1489,6 @@ packages:
       source-map: 0.6.1
       tiny-invariant: 1.3.3
       tslib: 2.8.1
-    dev: false
-
-  /remotion@4.0.371(react-dom@19.0.0)(react@19.0.0):
-    resolution: {integrity: sha512-hbGKSySLHgiZaYebOg6GmCTFS/OuhRC3kgNPenzxe2xrfoFR946ROwhTU8QQKIIHcN1K9jEBtmn3hrJke8plqw==}
-    peerDependencies:
-      react: '>=16.8.0'
-      react-dom: '>=16.8.0'
-    dependencies:
-      react: 19.0.0
-      react-dom: 19.0.0(react@19.0.0)
     dev: false
 
   /remotion@4.0.372(react-dom@19.0.0)(react@19.0.0):
