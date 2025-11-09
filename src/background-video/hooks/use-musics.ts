@@ -22,6 +22,7 @@ export const useMusics = (props: z.infer<typeof musicsSchema>) => {
       props.musics.map(async (music) => {
         try {
           const result = await parseMedia({
+            acknowledgeRemotionLicense: true,
             src: music.url,
             fields: {
               durationInSeconds: true,
