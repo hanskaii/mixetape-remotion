@@ -8,6 +8,9 @@ dependencies:
   '@remotion/cli':
     specifier: ^4.0.372
     version: 4.0.372(react-dom@19.0.0)(react@19.0.0)
+  '@remotion/media-parser':
+    specifier: ^4.0.372
+    version: 4.0.373
   '@remotion/zod-types':
     specifier: 4.0.372
     version: 4.0.372(react-dom@19.0.0)(react@19.0.0)(zod@3.25.76)
@@ -522,6 +525,10 @@ packages:
 
   /@remotion/media-parser@4.0.372:
     resolution: {integrity: sha512-3pXPPnnLFzRf2g6rgMh97At1dchrvrtbjccud2ZmooZKgeL1MUbdMX+IOgda0LcOFdnlT1hu8AqslnV2rjWcHw==}
+    dev: false
+
+  /@remotion/media-parser@4.0.373:
+    resolution: {integrity: sha512-dGMHfwQJidGr9xKR9ITUPB0t3sNcZ3ymj6wkP0hD0Ik5wryonqipVk65ERaYJxtIwcZlaTlPC7SoWowu1zb+lA==}
     dev: false
 
   /@remotion/media-utils@4.0.372(react-dom@19.0.0)(react@19.0.0):

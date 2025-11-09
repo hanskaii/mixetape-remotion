@@ -1,33 +1,46 @@
+import { parseMedia } from "@remotion/media-parser";
 import { Composition } from "remotion";
 import {
-	BackgroundVideoSchema,
-	defaultBackgroundVideoProps,
-	type Music,
-	PRESETS,
+  BackgroundVideoSchema,
+  defaultBackgroundVideoProps,
+  PRESETS,
 } from "./background-video/constants";
 import { BackgroundVideo } from "./background-video/main";
 
-// Each <Composition> is an entry in the sidebar!
-
-const calculateDuration = (musics: Array<Music>, fps: number) => {
-	const totalSeconds = musics.reduce((acc, music) => acc + music.duration, 0);
-	return Math.round(totalSeconds * fps);
-};
-
 export const Root: React.FC = () => {
-	return (
-		<Composition
-			id="BackgroundVideo"
-			component={BackgroundVideo}
-			durationInFrames={calculateDuration(
-				defaultBackgroundVideoProps.musics,
-				PRESETS.fps,
-			)}
-			fps={PRESETS.fps}
-			width={PRESETS.dimensions.landscape.width}
-			height={PRESETS.dimensions.landscape.height}
-			schema={BackgroundVideoSchema}
-			defaultProps={{ ...defaultBackgroundVideoProps }}
-		/>
-	);
+  return (
+    <Composition
+      id="BackgroundVideo"
+      component={BackgroundVideo}
+      fps={PRESETS.fps}
+      width={PRESETS.dimensions.landscape.width}
+      height={PRESETS.dimensions.landscape.height}
+      schema={BackgroundVideoSchema}
+      defaultProps={{ ...defaultBackgroundVideoProps }}
+      calculateMetadata={async ({ props }) => {
+        const durations = await Promise.all(
+          props.musics.map(async (music) => {
+            try {
+              const result = await parseMedia({
+                src: music.url,
+                fields: {
+                  durationInSeconds: true,
+                },
+              });
+              return result.durationInSeconds ?? 30;
+            } catch (error) {
+              console.error(`Error parsing ${music.url}:`, error);
+              return 30;
+            }
+          })
+        );
+        const totalDurationInSeconds = durations.reduce((a, b) => a + b, 0);
+        const durationInFrames = Math.round(totalDurationInSeconds * PRESETS.fps);
+        return {
+          durationInFrames,
+          fps: PRESETS.fps,
+        };
+      }}
+    />
+  );
 };
