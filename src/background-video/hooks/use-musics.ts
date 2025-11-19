@@ -1,4 +1,4 @@
-import { parseMedia } from "@remotion/media-parser";
+import { ALL_FORMATS, Input, UrlSource } from "mediabunny";
 import { useEffect, useMemo, useState } from "react";
 import { continueRender, delayRender, useCurrentFrame, useVideoConfig } from "remotion";
 import { z } from "zod";
@@ -14,42 +14,54 @@ export const useMusics = (props: z.infer<typeof musicsSchema>) => {
   const [musicDurations, setMusicDurations] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load audio durations using @remotion/media-parser
+  // Load audio durations using mediabunny (Optimized)
   useEffect(() => {
     const handle = delayRender();
 
-    Promise.all(
-      props.musics.map(async (music) => {
-        try {
-          const result = await parseMedia({
-            acknowledgeRemotionLicense: true,
-            src: music.url,
-            fields: {
-              durationInSeconds: true,
-            },
-          });
+    const fetchDurations = async () => {
+      try {
+        const durations = await Promise.all(
+          props.musics.map(async (music) => {
+            let input;
+            try {
+              // Inisialisasi Input MediaBunny
+              input = new Input({
+                source: new UrlSource(music.url),
+                formats: ALL_FORMATS, // Mendukung MP4, MP3, WAV, dll.
+              });
 
-          return result.durationInSeconds ?? 30;
-        } catch (error) {
-          console.error(`Error parsing ${music.url}:`, error);
-          return 30; // fallback
-        }
-      })
-    )
-      .then(durations => {
+              // computeDuration() mengembalikan durasi dalam detik
+              const duration = await input.computeDuration();
+
+              return duration ?? 30;
+            } catch (error) {
+              console.error(`Error parsing ${music.url}:`, error);
+              return 30; // fallback jika gagal load
+            } finally {
+              // Selalu bersihkan resource
+              if (input) {
+                input.dispose();
+              }
+            }
+          })
+        );
+
         console.log('Audio durations loaded:', durations);
         setMusicDurations(durations);
         setIsLoading(false);
         continueRender(handle);
-      })
-      .catch(error => {
+      } catch (error) {
         console.error("Error loading audio durations:", error);
-        // Fallback to default duration if loading fails
+        // Fallback global jika Promise.all gagal (seharusnya jarang terjadi karena try/catch internal)
         const fallbackDurations = props.musics.map(() => 30);
         setMusicDurations(fallbackDurations);
         setIsLoading(false);
         continueRender(handle);
-      });
+      }
+    };
+
+    fetchDurations();
+
   }, [props.musics]);
 
   // Memoize validation
