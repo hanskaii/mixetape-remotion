@@ -11,12 +11,12 @@
   "repository": {},
   "license": "UNLICENSED",
   "dependencies": {
-    "@remotion/cli": "^4.0.372",
-    "@remotion/media-parser": "^4.0.372",
+    "@remotion/cli": "^4.0.376",
+    "@remotion/media-parser": "^4.0.376",
     "@remotion/zod-types": "4.0.372",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "remotion": "^4.0.372",
+    "remotion": "^4.0.376",
     "zod": "^3.25.76"
   },
   "devDependencies": {
