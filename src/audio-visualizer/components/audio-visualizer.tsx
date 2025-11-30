@@ -1,13 +1,12 @@
 import { useAudioData, visualizeAudio } from "@remotion/media-utils";
-import {
-  AbsoluteFill,
-  interpolate,
-  useCurrentFrame,
-  useVideoConfig,
-} from "remotion";
-import { CROSSFADE_DURATION_FRAMES, type Music, type VisualizerProps } from "../constants";
-import { getTrackSchedule } from "../utils/audio";
 import { useEffect, useMemo, useRef } from "react";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  CROSSFADE_DURATION_FRAMES,
+  type Music,
+  type VisualizerProps,
+} from "../constants";
+import { getTrackSchedule } from "../utils/audio";
 
 interface AudioVisualizerProps {
   musics: Music[];
@@ -15,16 +14,13 @@ interface AudioVisualizerProps {
   visualizer: VisualizerProps["visualizer"];
 }
 
-const defaultMusics = [{ url: "mock.mp3" }];
-const defaultDurations = [3000];
-
 export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
-  musics = defaultMusics,
-  trackDurations = defaultDurations,
+  musics,
+  trackDurations,
   visualizer,
 }) => {
   const { position, useTitle, title, settings } = visualizer;
-  const { fontSize, fontFamily, color } = title;
+  const { fontSize, color } = title;
   const { barWidth, gap, maxBarHeight, barColor, barsToDisplay } = settings;
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
@@ -40,7 +36,10 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   // 4096 bisa agak berat di calculation meski render canvasnya cepat.
   const samplesToFetch = 4096;
 
-  const schedule = useMemo(() => getTrackSchedule(trackDurations, CROSSFADE_DURATION_FRAMES), [trackDurations]);
+  const schedule = useMemo(
+    () => getTrackSchedule(trackDurations, CROSSFADE_DURATION_FRAMES),
+    [trackDurations],
+  );
 
   const currentTitle = useMemo(() => {
     if (!useTitle) return null;
@@ -59,86 +58,98 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     const mixed = new Array(samplesToFetch).fill(0);
 
     schedule.forEach((track, index) => {
-        const { startFrame, endFrame, duration } = track;
-        if (frame < startFrame || frame >= endFrame) return;
+      const { startFrame, endFrame, duration } = track;
+      if (frame < startFrame || frame >= endFrame) return;
 
-        const audioData = audioDatas[index];
-        if (!audioData) return;
+      const audioData = audioDatas[index];
+      if (!audioData) return;
 
-        const trackFrame = frame - startFrame;
+      const trackFrame = frame - startFrame;
 
-        const samples = visualizeAudio({
-            fps,
-            frame: trackFrame,
-            audioData,
-            numberOfSamples: samplesToFetch,
-        });
+      const samples = visualizeAudio({
+        fps,
+        frame: trackFrame,
+        audioData,
+        numberOfSamples: samplesToFetch,
+      });
 
-        const isFirst = index === 0;
-        const isLast = index === schedule.length - 1;
+      const isFirst = index === 0;
+      const isLast = index === schedule.length - 1;
 
-        let volume = 1;
-        if (!isFirst && trackFrame < CROSSFADE_DURATION_FRAMES) {
-            volume = trackFrame / CROSSFADE_DURATION_FRAMES;
-        } else if (!isLast && trackFrame > duration - CROSSFADE_DURATION_FRAMES) {
-            volume = 1 - (trackFrame - (duration - CROSSFADE_DURATION_FRAMES)) / CROSSFADE_DURATION_FRAMES;
-        }
+      let volume = 1;
+      if (!isFirst && trackFrame < CROSSFADE_DURATION_FRAMES) {
+        volume = trackFrame / CROSSFADE_DURATION_FRAMES;
+      } else if (!isLast && trackFrame > duration - CROSSFADE_DURATION_FRAMES) {
+        volume =
+          1 -
+          (trackFrame - (duration - CROSSFADE_DURATION_FRAMES)) /
+          CROSSFADE_DURATION_FRAMES;
+      }
 
-        for (let i = 0; i < samplesToFetch; i++) {
-            mixed[i] += samples[i] * volume;
-        }
+      for (let i = 0; i < samplesToFetch; i++) {
+        mixed[i] += samples[i] * volume;
+      }
     });
     return mixed;
   }, [frame, audioDatas, schedule, fps]);
 
   // --- LOGIC MAPPING (Monstercat Style Binning) ---
   const visualBars = useMemo(() => {
-      const bars = [];
-      const minBinIndex = 2;   // ~20-40 Hz (Start Bass)
-      const maxBinIndex = 240; // ~3000 Hz (End Mids/Vocal presence)
+    const bars = [];
+    const minBinIndex = 2; // ~20-40 Hz (Start Bass)
+    const maxBinIndex = 240; // ~3000 Hz (End Mids/Vocal presence)
 
-      for (let i = 0; i < barsToDisplay; i++) {
-        const t = i / barsToDisplay;
+    for (let i = 0; i < barsToDisplay; i++) {
+      const t = i / barsToDisplay;
 
-        // Logarithmic Interpolation (Curve 2.5 untuk fokus Bass)
-        const logStart = Math.pow(t, 2.5);
-        const logEnd = Math.pow((i + 1) / barsToDisplay, 2.5);
+      // Logarithmic Interpolation (Curve 2.5 untuk fokus Bass)
+      const logStart = t ** 2.5;
+      const logEnd = ((i + 1) / barsToDisplay) ** 2.5;
 
-        const startSampleIndex = Math.floor(minBinIndex + logStart * (maxBinIndex - minBinIndex));
-        const endSampleIndex = Math.floor(minBinIndex + logEnd * (maxBinIndex - minBinIndex));
+      const startSampleIndex = Math.floor(
+        minBinIndex + logStart * (maxBinIndex - minBinIndex),
+      );
+      const endSampleIndex = Math.floor(
+        minBinIndex + logEnd * (maxBinIndex - minBinIndex),
+      );
 
-        let sum = 0;
-        let count = 0;
-        const actualEnd = Math.max(startSampleIndex, endSampleIndex);
+      let sum = 0;
+      let count = 0;
+      const actualEnd = Math.max(startSampleIndex, endSampleIndex);
 
-        for (let j = startSampleIndex; j <= actualEnd && j < samplesToFetch; j++) {
-            sum += mixedSamples[j];
-            count++;
-        }
-
-        let value = count > 0 ? sum / count : 0;
-
-        // Hamming Window Simulation (Smoothing sisi bar)
-        const hammingWindow = 0.54 - 0.46 * Math.cos(2 * Math.PI * (i / (barsToDisplay - 1)));
-        value = value * (0.5 + 0.5 * hammingWindow);
-
-        // Equalization (Angkat Highs)
-        const eqCurve = 1 + (t * 4);
-        value *= eqCurve;
-
-        bars.push(value);
+      for (
+        let j = startSampleIndex;
+        j <= actualEnd && j < samplesToFetch;
+        j++
+      ) {
+        sum += mixedSamples[j];
+        count++;
       }
-      return bars;
+
+      let value = count > 0 ? sum / count : 0;
+
+      // Hamming Window Simulation (Smoothing sisi bar)
+      const hammingWindow =
+        0.54 - 0.46 * Math.cos(2 * Math.PI * (i / (barsToDisplay - 1)));
+      value = value * (0.5 + 0.5 * hammingWindow);
+
+      // Equalization (Angkat Highs)
+      const eqCurve = 1 + t * 4;
+      value *= eqCurve;
+
+      bars.push(value);
+    }
+    return bars;
   }, [mixedSamples, barsToDisplay]);
 
   // Neighbor Smoothing 5-point
   const smoothedBars = useMemo(() => {
     return visualBars.map((val, i, arr) => {
-        const prev = arr[i - 1] || val;
-        const next = arr[i + 1] || val;
-        const next2 = arr[i + 2] || val;
-        const prev2 = arr[i - 2] || val;
-        return (prev2 + prev + val + next + next2) / 5;
+      const prev = arr[i - 1] || val;
+      const next = arr[i + 1] || val;
+      const next2 = arr[i + 2] || val;
+      const prev2 = arr[i - 2] || val;
+      return (prev2 + prev + val + next + next2) / 5;
     });
   }, [visualBars]);
 
@@ -148,7 +159,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
     // 1. Clear Canvas (Wajib setiap frame)
@@ -157,7 +168,7 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     // 2. Setup Style
 
     // Hitung posisi X awal
-    const totalWidth = (barsToDisplay * barWidth) + ((barsToDisplay - 1) * gap);
+    const totalWidth = barsToDisplay * barWidth + (barsToDisplay - 1) * gap;
 
     let startX = (width - totalWidth) / 2;
     if (position === "bottom-left") {
@@ -173,28 +184,28 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
 
     // 3. Loop Drawing
     smoothedBars.forEach((v, i) => {
-        // Posisi X
-        const x = startX + i * (barWidth + gap);
+      // Posisi X
+      const x = startX + i * (barWidth + gap);
 
-        // Hitung Tinggi Bar
-        // Math.pow(v, 0.7) -> Gamma correction agar nilai kecil tetap terlihat
-        const barHeight = Math.pow(v, 0.8) * maxBarHeight;
+      // Hitung Tinggi Bar
+      // Math.pow(v, 0.7) -> Gamma correction agar nilai kecil tetap terlihat
+      const barHeight = v ** 0.8 * maxBarHeight;
 
-        // Clamp height (tidak boleh minus, tidak boleh lebih dari max)
-        const finalHeight = Math.min(maxBarHeight, Math.max(0, barHeight));
+      // Clamp height (tidak boleh minus, tidak boleh lebih dari max)
+      const finalHeight = Math.min(maxBarHeight, Math.max(0, barHeight));
 
-        // Gambar Kotak (Rect)
-        if (finalHeight > 0) {
-            // ctx.fillRect(x, y, width, height)
-            // Karena koordinat Y canvas dimulai dari atas, kita gambar dari:
-            // (bottomY - finalHeight) sampai ke bawah
-            ctx.fillRect(x, bottomY - finalHeight, barWidth, finalHeight);
-        }
+      // Gambar Kotak (Rect)
+      if (finalHeight > 0) {
+        // ctx.fillRect(x, y, width, height)
+        // Karena koordinat Y canvas dimulai dari atas, kita gambar dari:
+        // (bottomY - finalHeight) sampai ke bawah
+        ctx.fillRect(x, bottomY - finalHeight, barWidth, finalHeight);
+      }
     });
 
     // 4. Draw Title
     if (useTitle && currentTitle) {
-      ctx.font = `bold ${fontSize}px ${fontFamily}`;
+      ctx.font = `800 ${fontSize}px sans-serif`;
       ctx.fillStyle = color;
 
       let textX = startX + totalWidth / 2;
@@ -208,21 +219,10 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         ctx.textAlign = "center";
         textX = startX + totalWidth / 2;
       }
-      
-      // Add shadow for better visibility
-      ctx.shadowColor = "rgba(0,0,0,0.8)";
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 2;
 
       const textY = bottomY + fontSize + 20;
       ctx.fillText(currentTitle, textX, textY);
-      
-      // Reset shadow
-      ctx.shadowColor = "transparent";
-      ctx.shadowBlur = 0;
     }
-
   }, [
     smoothedBars,
     width,
@@ -231,7 +231,6 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
     useTitle,
     currentTitle,
     fontSize,
-    fontFamily,
     color,
     barWidth,
     gap,
@@ -243,9 +242,9 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: 'transparent',
-        justifyContent: 'center',
-        alignItems: 'center'
+        backgroundColor: "transparent",
+        justifyContent: "center",
+        alignItems: "center",
       }}
     >
       {/* Canvas Element
@@ -256,10 +255,8 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
         width={width}
         height={height}
         style={{
-             width: '100%',
-             height: '100%',
-             // Efek Glow menggunakan CSS filter (lebih cepat daripada canvas shadowBlur)
-             filter: 'drop-shadow(0 0 10px rgba(255, 238, 238, 0.5))'
+          width: "100%",
+          height: "100%",
         }}
       />
     </AbsoluteFill>

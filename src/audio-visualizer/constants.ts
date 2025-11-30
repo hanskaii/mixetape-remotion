@@ -17,13 +17,12 @@ export const VisualizerSchema = z.object({
     useTitle: z.boolean().default(true),
     title: z.object({
       fontSize: z.number().default(32),
-      fontFamily: z.string().default("Arial"),
       color: z.string().default("#FFFFFF"),
     }).default({}),
     settings: z.object({
       barWidth: z.number().default(16),
       gap: z.number().default(4),
-      maxBarHeight: z.number().default(2400),
+      maxBarHeight: z.number().default(640),
       barColor: z.string().default("#ffffff"),
       barsToDisplay: z.number().default(64),
     }).default({}),
@@ -43,14 +42,13 @@ export const MOCK_DATA: VisualizerProps = {
     position: "bottom-center",
     title: {
       fontSize: 32,
-      fontFamily: "Arial",
       color: "#FFFFFF",
     },
     useTitle: true,
     settings: {
       barWidth: 16,
       gap: 4,
-      maxBarHeight: 2400,
+      maxBarHeight: 640,
       barColor: "#ffffff",
       barsToDisplay: 64,
     },

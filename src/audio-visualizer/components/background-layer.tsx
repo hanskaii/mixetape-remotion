@@ -4,9 +4,6 @@ export const BackgroundLayer: React.FC<{ url: string; seed: number }> = ({ url, 
   const frame = useCurrentFrame();
   const { durationInFrames, width, height } = useVideoConfig();
 
-  const colorCycleSpeed = 0.5;
-  const hue = (frame * colorCycleSpeed) % 360;
-
   // Deterministik Random values
   const scaleEnd = 1.15 + (random(seed) * 0.1); // Zoom 1.15x - 1.25x
   const xDir = random(seed + 1) > 0.5 ? 1 : -1;
@@ -26,7 +23,6 @@ export const BackgroundLayer: React.FC<{ url: string; seed: number }> = ({ url, 
           height: '100%',
           objectFit: 'cover',
           transform: `scale(${scale}) translate(${x}px, ${y}px)`,
-          filter: `hue-rotate(${hue}deg)`,
         }}
       />
       {/* Overlay Gelap agar Visualizer & Text terbaca */}
