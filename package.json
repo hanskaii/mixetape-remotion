@@ -11,14 +11,16 @@
   "repository": {},
   "license": "UNLICENSED",
   "dependencies": {
-    "@remotion/cli": "^4.0.377",
-    "@remotion/media-parser": "^4.0.377",
-    "@remotion/media-utils": "^4.0.377",
-    "@remotion/zod-types": "^4.0.377",
-    "mediabunny": "^1.25.0",
+    "@remotion/cli": "^4.0.379",
+    "@remotion/media-parser": "^4.0.379",
+    "@remotion/media-utils": "^4.0.379",
+    "@remotion/skia": "4.0.379",
+    "@remotion/zod-types": "^4.0.379",
+    "@shopify/react-native-skia": "^2.4.6",
+    "mediabunny": "^1.25.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "remotion": "^4.0.377",
+    "remotion": "^4.0.379",
     "zod": "3.22.3"
   },
   "devDependencies": {

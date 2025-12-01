@@ -1,7 +1,8 @@
-// This is your entry file! Refer to it when you render:
-// npx remotion render <entry-file> HelloWorld out/video.mp4
-
+import { LoadSkia } from "@shopify/react-native-skia/src/web";
 import { registerRoot } from "remotion";
-import { Root } from "./root";
 
-registerRoot(Root);
+(async () => {
+  await LoadSkia();
+  const { Root } = await import("./root");
+  registerRoot(Root);
+})();

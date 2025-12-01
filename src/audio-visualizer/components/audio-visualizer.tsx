@@ -1,12 +1,23 @@
 import { useAudioData, visualizeAudio } from "@remotion/media-utils";
-import { useEffect, useMemo, useRef } from "react";
-import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import {
+  Canvas,
+  Picture, // Kita pake Picture biar bisa gambar manual tapi performa tinggi
+  Skia,
+  Text as SkiaText,
+  useFont,
+  vec,
+  TileMode,
+} from "@shopify/react-native-skia";
+import { useMemo } from "react";
+import { AbsoluteFill, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import {
   CROSSFADE_DURATION_FRAMES,
   type Music,
   type VisualizerProps,
 } from "../constants";
 import { getTrackSchedule } from "../utils/audio";
+
+const FONT_SOURCE = staticFile("fonts/Inter-Bold.ttf");
 
 interface AudioVisualizerProps {
   musics: Music[];
@@ -25,240 +36,170 @@ export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
 
-  // 1. REF UNTUK CANVAS
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
+  const font = useFont(FONT_SOURCE, fontSize);
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const audioDatas = musics.map((m) => useAudioData(m.url));
 
-  // CONFIGURATION
-  // Kita gunakan 2048 agar aman untuk JS calculation tiap frame.
-  // 4096 bisa agak berat di calculation meski render canvasnya cepat.
+  // Sample rate standar (Optimized)
   const samplesToFetch = 4096;
 
   const schedule = useMemo(
     () => getTrackSchedule(trackDurations, CROSSFADE_DURATION_FRAMES),
-    [trackDurations],
+    [trackDurations]
   );
 
   const currentTitle = useMemo(() => {
     if (!useTitle) return null;
-
-    for (let i = schedule.length - 1; i >= 0; i--) {
-      const s = schedule[i];
-      if (frame >= s.startFrame && frame < s.endFrame) {
-        return musics[s.index]?.title;
-      }
-    }
-    return null;
+    const currentTrack = schedule.find(s => frame >= s.startFrame && frame < s.endFrame);
+    return currentTrack ? musics[currentTrack.index]?.title : null;
   }, [frame, schedule, musics, useTitle]);
 
-  // --- AUDIO PROCESSING (Sama seperti sebelumnya) ---
+  // --- AUDIO PROCESSING (Optimized Math) ---
   const mixedSamples = useMemo(() => {
-    const mixed = new Array(samplesToFetch).fill(0);
-
-    schedule.forEach((track, index) => {
+    const mixed = new Float32Array(samplesToFetch).fill(0);
+    for (let index = 0; index < schedule.length; index++) {
+      const track = schedule[index];
       const { startFrame, endFrame, duration } = track;
-      if (frame < startFrame || frame >= endFrame) return;
-
+      if (frame < startFrame || frame >= endFrame) continue;
       const audioData = audioDatas[index];
-      if (!audioData) return;
-
+      if (!audioData) continue;
       const trackFrame = frame - startFrame;
-
-      const samples = visualizeAudio({
-        fps,
-        frame: trackFrame,
-        audioData,
-        numberOfSamples: samplesToFetch,
-      });
-
+      let volume = 1;
       const isFirst = index === 0;
       const isLast = index === schedule.length - 1;
-
-      let volume = 1;
       if (!isFirst && trackFrame < CROSSFADE_DURATION_FRAMES) {
         volume = trackFrame / CROSSFADE_DURATION_FRAMES;
       } else if (!isLast && trackFrame > duration - CROSSFADE_DURATION_FRAMES) {
-        volume =
-          1 -
-          (trackFrame - (duration - CROSSFADE_DURATION_FRAMES)) /
-          CROSSFADE_DURATION_FRAMES;
+        volume = 1 - (trackFrame - (duration - CROSSFADE_DURATION_FRAMES)) / CROSSFADE_DURATION_FRAMES;
       }
-
+      if (volume <= 0.01) continue;
+      const samples = visualizeAudio({
+        fps, frame: trackFrame, audioData, numberOfSamples: samplesToFetch,
+      });
       for (let i = 0; i < samplesToFetch; i++) {
         mixed[i] += samples[i] * volume;
       }
-    });
+    }
     return mixed;
   }, [frame, audioDatas, schedule, fps]);
 
-  // --- LOGIC MAPPING (Monstercat Style Binning) ---
-  const visualBars = useMemo(() => {
-    const bars = [];
-    const minBinIndex = 2; // ~20-40 Hz (Start Bass)
-    const maxBinIndex = 240; // ~3000 Hz (End Mids/Vocal presence)
-
+  const smoothedBars = useMemo(() => {
+    const bars = new Float32Array(barsToDisplay);
+    const minBinIndex = 2; const maxBinIndex = 120;
     for (let i = 0; i < barsToDisplay; i++) {
       const t = i / barsToDisplay;
-
-      // Logarithmic Interpolation (Curve 2.5 untuk fokus Bass)
-      const logStart = t ** 2.5;
-      const logEnd = ((i + 1) / barsToDisplay) ** 2.5;
-
-      const startSampleIndex = Math.floor(
-        minBinIndex + logStart * (maxBinIndex - minBinIndex),
-      );
-      const endSampleIndex = Math.floor(
-        minBinIndex + logEnd * (maxBinIndex - minBinIndex),
-      );
-
-      let sum = 0;
-      let count = 0;
+      const logStart = t * t * t;
+      const logEnd = ((i + 1) / barsToDisplay) ** 3;
+      const startSampleIndex = Math.floor(minBinIndex + logStart * (maxBinIndex - minBinIndex));
+      const endSampleIndex = Math.floor(minBinIndex + logEnd * (maxBinIndex - minBinIndex));
+      let sum = 0; let count = 0;
       const actualEnd = Math.max(startSampleIndex, endSampleIndex);
-
-      for (
-        let j = startSampleIndex;
-        j <= actualEnd && j < samplesToFetch;
-        j++
-      ) {
-        sum += mixedSamples[j];
-        count++;
+      for (let j = startSampleIndex; j <= actualEnd && j < samplesToFetch; j++) {
+        sum += mixedSamples[j]; count++;
       }
-
       let value = count > 0 ? sum / count : 0;
-
-      // Hamming Window Simulation (Smoothing sisi bar)
-      const hammingWindow =
-        0.54 - 0.46 * Math.cos(2 * Math.PI * (i / (barsToDisplay - 1)));
-      value = value * (0.5 + 0.5 * hammingWindow);
-
-      // Equalization (Angkat Highs)
-      const eqCurve = 1 + t * 4;
-      value *= eqCurve;
-
-      bars.push(value);
+      value *= 1 + Math.sin((i / barsToDisplay) * Math.PI);
+      value *= (1 + t * 4);
+      bars[i] = value;
     }
-    return bars;
+    const result = new Float32Array(barsToDisplay);
+    for(let i = 0; i < barsToDisplay; i++) {
+        const prev = bars[i - 1] || bars[i];
+        const curr = bars[i];
+        const next = bars[i + 1] || bars[i];
+        result[i] = (prev + curr + next) / 3;
+    }
+    return result;
   }, [mixedSamples, barsToDisplay]);
 
-  // Neighbor Smoothing 5-point
-  const smoothedBars = useMemo(() => {
-    return visualBars.map((val, i, arr) => {
-      const prev = arr[i - 1] || val;
-      const next = arr[i + 1] || val;
-      const next2 = arr[i + 2] || val;
-      const prev2 = arr[i - 2] || val;
-      return (prev2 + prev + val + next + next2) / 5;
-    });
-  }, [visualBars]);
+  // --- LAYOUT VARS ---
+  const totalWidth = barsToDisplay * barWidth + (barsToDisplay - 1) * gap;
+  let startX = (width - totalWidth) / 2;
+  if (position === "bottom-left") startX = 100;
+  else if (position === "bottom-right") startX = width - totalWidth - 100;
+  const bottomY = useTitle ? height - (fontSize + 120) : height - 80;
 
-  // --- 🎨 CANVAS RENDERING EFFECT ---
-  // Inilah kunci performa tinggi: Draw pixels, don't update DOM.
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Optimasi Warna
+  const isGradient = Array.isArray(barColor);
+  const skiaColors = useMemo(() => {
+      if (Array.isArray(barColor)) return barColor.map(c => Skia.Color(c));
+      return [Skia.Color(barColor as string)];
+  }, [barColor]);
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  // 🔥 STYLE FIX: PICTURE RECORDER (Imperative) 🔥
+  // Kita gambar manual per batang supaya bisa set Gradient Per Batang (Local Gradient)
+  const picture = useMemo(() => {
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, width, height));
+    const paint = Skia.Paint();
+    paint.setAntiAlias(true);
 
-    // 1. Clear Canvas (Wajib setiap frame)
-    ctx.clearRect(0, 0, width, height);
-
-    // 2. Setup Style
-
-    // Hitung posisi X awal
-    const totalWidth = barsToDisplay * barWidth + (barsToDisplay - 1) * gap;
-
-    let startX = (width - totalWidth) / 2;
-    if (position === "bottom-left") {
-      startX = 100;
-    } else if (position === "bottom-right") {
-      startX = width - totalWidth - 100;
-    }
-
-    // Posisi Y bawah
-    const bottomY = useTitle ? height - (fontSize + 120) : height - 80;
-
-    ctx.fillStyle = barColor;
-
-    // 3. Loop Drawing
     smoothedBars.forEach((v, i) => {
-      // Posisi X
-      const x = startX + i * (barWidth + gap);
+        const barHeight = Math.sqrt(v) * maxBarHeight;
+        if (barHeight <= 1) return;
 
-      // Hitung Tinggi Bar
-      // Math.pow(v, 0.7) -> Gamma correction agar nilai kecil tetap terlihat
-      const barHeight = v ** 0.8 * maxBarHeight;
+        const finalHeight = Math.min(maxBarHeight, Math.max(0, barHeight));
+        const x = startX + i * (barWidth + gap);
+        const y = bottomY - finalHeight;
 
-      // Clamp height (tidak boleh minus, tidak boleh lebih dari max)
-      const finalHeight = Math.min(maxBarHeight, Math.max(0, barHeight));
+        // --- INI KUNCINYA: LOCAL GRADIENT PER BATANG ---
+        // Kita buat shader yang start/end-nya mengikuti tinggi masing-masing batang
+        if (isGradient) {
+            const shader = Skia.Shader.MakeLinearGradient(
+                vec(x, y),                // Start: Atas Batang
+                vec(x, y + finalHeight),  // End: Bawah Batang
+                skiaColors,
+                null,
+                TileMode.Clamp
+            );
+            paint.setShader(shader);
+        } else {
+            paint.setColor(skiaColors[0]);
+        }
 
-      // Gambar Kotak (Rect)
-      if (finalHeight > 0) {
-        // ctx.fillRect(x, y, width, height)
-        // Karena koordinat Y canvas dimulai dari atas, kita gambar dari:
-        // (bottomY - finalHeight) sampai ke bawah
-        ctx.fillRect(x, bottomY - finalHeight, barWidth, finalHeight);
-      }
+        // Gambar
+        const rect = Skia.XYWHRect(x, y, barWidth, finalHeight);
+        canvas.drawRRect(Skia.RRectXY(rect, 5, 5), paint); // Radius 5px
+
+        // Reset Shader untuk loop berikutnya
+        if (isGradient) paint.setShader(null);
     });
 
-    // 4. Draw Title
-    if (useTitle && currentTitle) {
-      ctx.font = `800 ${fontSize}px sans-serif`;
-      ctx.fillStyle = color;
+    return recorder.finishRecordingAsPicture();
+  }, [smoothedBars, width, height, startX, bottomY, skiaColors, isGradient, barWidth, gap, maxBarHeight]);
 
-      let textX = startX + totalWidth / 2;
-      if (position === "bottom-left") {
-        ctx.textAlign = "left";
-        textX = startX;
-      } else if (position === "bottom-right") {
-        ctx.textAlign = "right";
-        textX = startX + totalWidth;
-      } else {
-        ctx.textAlign = "center";
-        textX = startX + totalWidth / 2;
-      }
 
-      const textY = bottomY + fontSize + 20;
-      ctx.fillText(currentTitle, textX, textY);
-    }
-  }, [
-    smoothedBars,
-    width,
-    height,
-    position,
-    useTitle,
-    currentTitle,
-    fontSize,
-    color,
-    barWidth,
-    gap,
-    maxBarHeight,
-    barColor,
-    barsToDisplay,
-  ]); // Re-run setiap data bar berubah
+  // Text Logic
+  let textX = 0;
+  let textY = 0;
+  if (useTitle && currentTitle && font) {
+    const textWidth = font.getTextWidth(currentTitle);
+    textY = bottomY + fontSize + 20;
+    if (position === "bottom-left") textX = startX;
+    else if (position === "bottom-right") textX = startX + totalWidth - textWidth;
+    else textX = startX + totalWidth / 2 - textWidth / 2;
+  }
 
   return (
-    <AbsoluteFill
-      style={{
+    <AbsoluteFill style={{
         backgroundColor: "transparent",
         justifyContent: "center",
         alignItems: "center",
-      }}
-    >
-      {/* Canvas Element
-         Ini jauh lebih ringan daripada me-render 64 <div>
-      */}
-      <canvas
-        ref={canvasRef}
-        width={width}
-        height={height}
-        style={{
-          width: "100%",
-          height: "100%",
-        }}
-      />
+    }}>
+      <Canvas style={{ width, height }}>
+        {/* Render Gambar Hasil Rekaman (Super Cepat & Style Sesuai HTML) */}
+        <Picture picture={picture} />
+
+        {useTitle && font && currentTitle && (
+           <SkiaText
+              x={textX}
+              y={textY}
+              text={currentTitle}
+              font={font}
+              color={color}
+           />
+        )}
+      </Canvas>
     </AbsoluteFill>
   );
 };
