@@ -4,12 +4,19 @@ import { KenBurns } from "../effects/ken-burns";
 import { ZoomPulse } from "../effects/zoom-pulse";
 import type { BackgroundVideoProps } from "./constants";
 import { useAudioTracks } from "../hooks/use-audio-tracks";
+import { VideoBackground } from "./video-background";
 
 const Background = memo<{
   backgroundUrl: string;
   withEffect: boolean;
   effect?: string;
 }>(({ backgroundUrl, withEffect, effect }) => {
+  const isVideo = backgroundUrl.toLowerCase().match(/\.(mp4|webm|mov|mkv)(\?|$)/);
+
+  if (isVideo) {
+    return <VideoBackground videoUrl={backgroundUrl} />;
+  }
+
   if (!withEffect) {
     return (
       <Img
