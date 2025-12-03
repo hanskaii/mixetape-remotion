@@ -1,27 +1,25 @@
 import type React from "react";
 import { useMemo } from "react";
 import { Html5Audio, interpolate, Sequence } from "remotion";
-import { CROSSFADE_DURATION_FRAMES, type Music } from "../constants";
+import { AudioTrack } from "../../types/schema";
+import { CROSSFADE_DURATION_FRAMES } from "../constants";
 
 interface AudioEngineProps {
-  musics: Music[];
-  trackDurations: number[]; // Durasi per track dalam frames
+  audioTracks: AudioTrack[];
+  trackDurations: number[]; // Duration per track in frames
 }
 
-export const AudioEngineResolved: React.FC<AudioEngineProps> = ({
-  musics,
-  trackDurations,
-}) => {
+export const AudioEngineResolved: React.FC<AudioEngineProps> = ({ audioTracks, trackDurations }) => {
   const tracks = useMemo(() => {
     let currentStart = 0;
-    return musics.map((music, index) => {
+    return audioTracks.map((track, index) => {
       const duration = trackDurations[index];
       const startFrame = currentStart;
       // Overlap tracks by subtracting crossfade duration from the next start time
       currentStart += duration - CROSSFADE_DURATION_FRAMES;
-      return { music, startFrame, duration, index };
+      return { track, startFrame, duration, index };
     });
-  }, [musics, trackDurations]);
+  }, [audioTracks, trackDurations]);
 
   return (
     <>
@@ -34,29 +32,26 @@ export const AudioEngineResolved: React.FC<AudioEngineProps> = ({
             key={i}
             from={t.startFrame}
             durationInFrames={t.duration}
-            layout="none" // Penting agar tidak mempengaruhi layout visual
+            layout="none" // Important so it doesn't affect visual layout
           >
             <Html5Audio
-              src={t.music.url}
+              src={t.track.url}
               volume={(f) => {
-                // f adalah frame relatif terhadap awal Sequence ini
+                // f is the frame relative to the start of this Sequence
 
-                // Fade In (kecuali lagu pertama)
+                // Fade In (except for the first song)
                 const fadeIn = isFirst
                   ? 1
                   : interpolate(f, [0, CROSSFADE_DURATION_FRAMES], [0, 1], {
-                    extrapolateRight: "clamp",
-                  });
+                      extrapolateRight: "clamp",
+                    });
 
-                // Fade Out (kecuali lagu terakhir)
+                // Fade Out (except for the last song)
                 const fadeOut = isLast
                   ? 1
-                  : interpolate(
-                    f,
-                    [t.duration - CROSSFADE_DURATION_FRAMES, t.duration],
-                    [1, 0],
-                    { extrapolateLeft: "clamp" },
-                  );
+                  : interpolate(f, [t.duration - CROSSFADE_DURATION_FRAMES, t.duration], [1, 0], {
+                      extrapolateLeft: "clamp",
+                    });
 
                 return fadeIn * fadeOut;
               }}

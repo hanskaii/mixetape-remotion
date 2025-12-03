@@ -1,9 +1,7 @@
 import { ALL_FORMATS, Input, UrlSource } from "mediabunny";
-import type { Music } from "../constants";
+import type { AudioTrack } from "../../types/schema";
 
-export const getAudioDurationInSeconds = async (
-  url: string,
-): Promise<number> => {
+export const getAudioDurationInSeconds = async (url: string): Promise<number> => {
   let input: Input | null = null;
   try {
     input = new Input({
@@ -13,7 +11,7 @@ export const getAudioDurationInSeconds = async (
 
     // computeDuration mengembalikan number | undefined
     const duration = await input.computeDuration();
-    return duration ?? 30; // Fallback 30 detik
+    return duration ?? 30; // Fallback 30 seconds
   } catch (err) {
     console.error(`Failed to parse duration for ${url}`, err);
     return 30;
@@ -24,16 +22,10 @@ export const getAudioDurationInSeconds = async (
   }
 };
 
-export const calculateTotalDuration = async (
-  musics: Music[],
-  fps: number,
-  crossfadeFrames: number,
-) => {
+export const calculateTotalDuration = async (audioTracks: AudioTrack[], fps: number, crossfadeFrames: number) => {
   const durations = await Promise.all(
-    musics.map((m) =>
-      m.durationInSeconds
-        ? Promise.resolve(m.durationInSeconds)
-        : getAudioDurationInSeconds(m.url),
+    audioTracks.map((track) =>
+      track.durationInSeconds ? Promise.resolve(track.durationInSeconds) : getAudioDurationInSeconds(track.url),
     ),
   );
 
@@ -41,8 +33,8 @@ export const calculateTotalDuration = async (
   const totalRawSeconds = durations.reduce((a, b) => a + b, 0);
   const totalFramesRaw = Math.ceil(totalRawSeconds * fps);
 
-  // Jika ada 2 lagu, ada 1 crossfade. Jika 3 lagu, 2 crossfade.
-  const totalCrossfades = Math.max(0, musics.length - 1);
+  // If there are 2 songs, 1 crossfade. If 3 songs, 2 crossfades.
+  const totalCrossfades = Math.max(0, audioTracks.length - 1);
   const totalDeduction = totalCrossfades * crossfadeFrames;
 
   return {
@@ -51,10 +43,7 @@ export const calculateTotalDuration = async (
   };
 };
 
-export const getTrackSchedule = (
-  trackDurations: number[],
-  crossfadeFrames: number,
-) => {
+export const getTrackSchedule = (trackDurations: number[], crossfadeFrames: number) => {
   let currentStart = 0;
   return trackDurations.map((duration, index) => {
     const startFrame = currentStart;
